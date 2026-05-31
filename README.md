@@ -19,11 +19,12 @@ After `shutup set`, ask the agent "what value did I enter?" — it genuinely can
 ## Install
 
 ```sh
+cd cli
 make install          # builds and installs to ~/.local/bin/shutup
 # or pick a location:
 make install SHUTUP_BIN=/usr/local/bin/shutup
 # or by hand:
-cd cli && go build -o ~/.local/bin/shutup .
+go build -o ~/.local/bin/shutup .
 ```
 
 Requires Go 1.24+. The binary is a single static, cgo-free executable.
@@ -112,8 +113,10 @@ bundle (`shutup env export dev -o dev.bundle`); they `shutup env import dev.bund
 
 ## Development
 
+From `cli/`:
+
 ```sh
-make build     # build to ./cli/shutup
+make build     # build to ./shutup
 make install   # build + install to ~/.local/bin/shutup
 make test      # run tests
 make cover     # tests with coverage summary
