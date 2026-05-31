@@ -183,6 +183,47 @@ uses it.`,
 	},
 }
 
+// env delete (global, by id — no project required; for cleaning up orphans)
+var envDeleteYes bool
+var envDeleteCmd = &cobra.Command{
+	Use:   "delete <env-id>",
+	Short: "Delete an env bag from this machine by id (e.g. orphans left after destroy)",
+	Long: `Deletes an env's stored values from this machine by id. Unlike ` + "`env remove`" + ` (which
+unmaps an env from the current project), this operates directly on the store and
+needs no project — so it's how you clean up envs orphaned after ` + "`shutup destroy`" + `.
+
+Find ids with ` + "`shutup env list --all`" + `. This is destructive and cannot be undone;
+asks for confirmation unless --yes. Make sure no other project still uses the id.`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		envID := args[0]
+		store, err := env.NewLocalEnvStore()
+		if err != nil {
+			return err
+		}
+		if _, lerr := store.Load(envID); lerr == env.ErrNotFound {
+			return fmt.Errorf("no env with id %q on this machine", envID)
+		} else if lerr != nil {
+			return lerr
+		}
+		if !envDeleteYes {
+			ans, perr := tty.PromptLine(fmt.Sprintf("Permanently delete env %s and its values? Type 'yes': ", envID))
+			if perr != nil {
+				return perr
+			}
+			if ans != "yes" {
+				ui.Info("Aborted. Nothing was deleted.")
+				return nil
+			}
+		}
+		if err := store.Delete(envID); err != nil {
+			return err
+		}
+		ui.Success("Deleted env %s", ui.Value(envID))
+		return nil
+	},
+}
+
 // env export
 var envExportOut string
 var envExportCmd = &cobra.Command{
@@ -290,6 +331,8 @@ func init() {
 	envExportCmd.Flags().StringVarP(&envExportOut, "out", "o", "", "write the bundle to a file instead of stdout")
 	envImportCmd.Flags().StringVar(&envImportAs, "as", "", "also map the imported env into this project under this name")
 
-	envCmd.AddCommand(envAddCmd, envLsCmd, envDefaultCmd, envRmCmd, envExportCmd, envImportCmd)
+	envDeleteCmd.Flags().BoolVar(&envDeleteYes, "yes", false, "skip the confirmation prompt")
+
+	envCmd.AddCommand(envAddCmd, envLsCmd, envDefaultCmd, envRmCmd, envDeleteCmd, envExportCmd, envImportCmd)
 	rootCmd.AddCommand(envCmd)
 }

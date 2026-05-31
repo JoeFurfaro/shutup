@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/joe/shutup/internal/agent"
 	"github.com/joe/shutup/internal/config"
@@ -31,10 +32,24 @@ confirmation unless --yes.`,
 		}
 		claudePath := filepath.Join(filepath.Dir(cfgPath), "CLAUDE.md")
 
+		// Capture the env ids this project references, to report after removal so
+		// they can be cleaned up if orphaned.
+		var envIDs []string
+		if cfg, lerr := config.Load(cfgPath); lerr == nil {
+			seen := map[string]bool{}
+			for _, envID := range cfg.Envs {
+				if !seen[envID] {
+					seen[envID] = true
+					envIDs = append(envIDs, envID)
+				}
+			}
+			sort.Strings(envIDs)
+		}
+
 		ui.Info("This will remove shutup from this project:")
 		ui.Hint("config:    %s", cfgPath)
 		ui.Hint("CLAUDE.md: the shutup block (if present)")
-		ui.Hint("envs are NOT deleted (shared; use `shutup env remove --delete` for those)")
+		ui.Hint("envs are NOT deleted (they may be shared)")
 
 		if !destroyYes {
 			ans, perr := tty.PromptLine("Type 'yes' to confirm: ")
@@ -53,6 +68,14 @@ confirmation unless --yes.`,
 			return err
 		}
 		ui.Success("Removed shutup from this project (envs kept).")
+		if len(envIDs) > 0 {
+			ui.Info("")
+			ui.Hint("this project referenced these envs (now possibly orphaned):")
+			for _, envID := range envIDs {
+				ui.Hint("  %s", envID)
+			}
+			ui.Hint("delete any that nothing else uses with `shutup env delete <id>`")
+		}
 		return nil
 	},
 }
