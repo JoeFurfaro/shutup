@@ -1,0 +1,7 @@
+# locally-built CLI binary (use `make install` to put it on your PATH)
+cli/shutup
+/shutup
+
+# coverage / profiling output
+*.out
+*.prof
