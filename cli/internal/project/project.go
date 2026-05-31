@@ -134,6 +134,46 @@ func (p *Project) SetVar(envNameArg, name, value string, public bool) (wired boo
 	return wired, nil
 }
 
+// CopyEnv creates a fresh env in the store seeded with a copy of the values from
+// the project env named srcName, and returns the new env id plus the names that
+// were copied, partitioned into public and secret (sorted). With publicOnly,
+// secret vars are skipped so they must be re-entered per env. Values are copied
+// store-side and never returned. The caller maps the new id into the project.
+func (p *Project) CopyEnv(srcName string, publicOnly bool) (newEnvID string, public, secret []string, err error) {
+	srcID, ok := p.Config.EnvID(srcName)
+	if !ok {
+		return "", nil, nil, fmt.Errorf("this project has no env named %q to copy from (see `shutup env list`)", srcName)
+	}
+	src, err := p.Store.Load(srcID)
+	if err == env.ErrNotFound {
+		return "", nil, nil, fmt.Errorf("env %q (%s) is not set up on this machine", srcName, srcID)
+	}
+	if err != nil {
+		return "", nil, nil, err
+	}
+	e, err := p.Store.Create()
+	if err != nil {
+		return "", nil, nil, err
+	}
+	for name, v := range src.Vars {
+		if publicOnly && v.Secret {
+			continue
+		}
+		e.Vars[name] = v
+		if v.Secret {
+			secret = append(secret, name)
+		} else {
+			public = append(public, name)
+		}
+	}
+	if err := p.Store.Save(e); err != nil {
+		return "", nil, nil, err
+	}
+	sort.Strings(public)
+	sort.Strings(secret)
+	return e.ID, public, secret, nil
+}
+
 // Use wires the current project to consume name (no value). Returns false if
 // already consumed.
 func (p *Project) Use(name string) (bool, error) {

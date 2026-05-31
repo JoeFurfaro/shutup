@@ -13,7 +13,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var initLink string
+var (
+	initLink       string
+	initNoClaudeMD bool
+)
 
 var initCmd = &cobra.Command{
 	Use:   "init",
@@ -35,6 +38,7 @@ this directory or any parent).`,
 
 func init() {
 	initCmd.Flags().StringVar(&initLink, "link", "", "link an existing env id as the default env instead of creating one")
+	initCmd.Flags().BoolVar(&initNoClaudeMD, "no-claude-md", false, "do not write the shutup block into CLAUDE.md")
 	rootCmd.AddCommand(initCmd)
 }
 
@@ -80,9 +84,15 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing %s: %w", config.Filename, err)
 	}
 
-	res, err := agent.InjectInto(filepath.Join(cwd, "CLAUDE.md"))
-	if err != nil {
-		return fmt.Errorf("updating CLAUDE.md: %w", err)
+	res := agent.Unchanged
+	wroteClaudeMD := false
+	if !initNoClaudeMD {
+		var ierr error
+		res, ierr = agent.InjectInto(filepath.Join(cwd, "CLAUDE.md"))
+		if ierr != nil {
+			return fmt.Errorf("updating CLAUDE.md: %w", ierr)
+		}
+		wroteClaudeMD = res == agent.Created || res == agent.Added || res == agent.Updated
 	}
 
 	ui.Success("Initialized shutup project")
@@ -92,17 +102,24 @@ func runInit(cmd *cobra.Command, args []string) error {
 	} else {
 		ui.Hint("default env: dev (%s)", ui.Value(envID))
 	}
-	switch res {
-	case agent.Created:
-		ui.Hint("CLAUDE.md:   created with shutup instructions")
-	case agent.Added:
-		ui.Hint("CLAUDE.md:   added shutup instructions")
-	case agent.Updated:
-		ui.Hint("CLAUDE.md:   updated shutup instructions")
-	case agent.Unchanged:
-		ui.Hint("CLAUDE.md:   already up to date")
+	if initNoClaudeMD {
+		ui.Hint("CLAUDE.md:   skipped (--no-claude-md)")
+	} else {
+		switch res {
+		case agent.Created:
+			ui.Hint("CLAUDE.md:   created with shutup instructions")
+		case agent.Added:
+			ui.Hint("CLAUDE.md:   added shutup instructions")
+		case agent.Updated:
+			ui.Hint("CLAUDE.md:   updated shutup instructions")
+		case agent.Unchanged:
+			ui.Hint("CLAUDE.md:   already up to date")
+		}
 	}
 	ui.Info("")
+	if wroteClaudeMD {
+		ui.Info("shutup edited CLAUDE.md (a tracked file) so agents use it instead of reading .env — re-run with --no-claude-md to skip.")
+	}
 	ui.Hint("next: `shutup set <NAME>` to add a variable (secret by default)")
 	return nil
 }

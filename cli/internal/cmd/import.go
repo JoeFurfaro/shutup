@@ -87,6 +87,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	}
 
 	imported := 0
+	var publicNames []string
 	for _, pair := range pairs {
 		public := publicSet[pair.Name]
 		if importInteractive {
@@ -99,15 +100,25 @@ func runImport(cmd *cobra.Command, args []string) error {
 		if _, err := p.SetVar(importEnv, pair.Name, pair.Value, public); err != nil {
 			return err
 		}
+		if public {
+			publicNames = append(publicNames, pair.Name)
+		}
 		imported++
 	}
 
 	ui.Success("Imported %d variables into env %s", imported, ui.Value(effectiveEnv(p, importEnv)))
+	// Echo what was made public (names only) so a mis-classified secret is
+	// visible for review — the rest are secret by default.
+	if len(publicNames) > 0 {
+		ui.Hint("marked public: %s", strings.Join(publicNames, ", "))
+	}
 	if importDelete {
 		if err := os.Remove(file); err != nil {
 			return err
 		}
 		ui.Hint("deleted %s", file)
+	} else {
+		ui.Hint("the plaintext %s is still on disk — re-run with --delete to remove it", file)
 	}
 	return nil
 }

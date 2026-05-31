@@ -288,3 +288,110 @@ func TestSetVarBadEnv(t *testing.T) {
 		t.Error("SetVar with an unknown env should error")
 	}
 }
+
+// seedDev populates the test project's dev env with two public and two secret vars.
+func seedDev(t *testing.T, p *Project) {
+	t.Helper()
+	for _, v := range []struct {
+		name   string
+		public bool
+	}{
+		{"PORT", true}, {"LOG_LEVEL", true}, {"DATABASE_URL", false}, {"JWT_SECRET", false},
+	} {
+		if _, err := p.SetVar("dev", v.name, v.name+"-val", v.public); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestCopyEnvFull(t *testing.T) {
+	p := newTestProject(t)
+	seedDev(t, p)
+
+	srcID, _ := p.Config.EnvID("dev")
+	newID, public, secret, err := p.CopyEnv("dev", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A full copy carries every var, partitioned and sorted.
+	if got, want := public, []string{"LOG_LEVEL", "PORT"}; !equalStrings(got, want) {
+		t.Errorf("public = %v, want %v", got, want)
+	}
+	if got, want := secret, []string{"DATABASE_URL", "JWT_SECRET"}; !equalStrings(got, want) {
+		t.Errorf("secret = %v, want %v", got, want)
+	}
+	// The new env is a distinct bag with the values (and visibility) intact.
+	if newID == srcID {
+		t.Fatalf("copy should get a fresh id, got the source id %q", newID)
+	}
+	e, err := p.Store.Load(newID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e.Vars["DATABASE_URL"].Value != "DATABASE_URL-val" || !e.Vars["DATABASE_URL"].Secret {
+		t.Errorf("copied secret wrong: %+v", e.Vars["DATABASE_URL"])
+	}
+	if e.Vars["PORT"].Value != "PORT-val" || e.Vars["PORT"].Secret {
+		t.Errorf("copied public wrong: %+v", e.Vars["PORT"])
+	}
+}
+
+func TestCopyEnvPublicOnly(t *testing.T) {
+	p := newTestProject(t)
+	seedDev(t, p)
+
+	newID, public, secret, err := p.CopyEnv("dev", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(secret) != 0 {
+		t.Errorf("public-only copy should report no secrets, got %v", secret)
+	}
+	if got, want := public, []string{"LOG_LEVEL", "PORT"}; !equalStrings(got, want) {
+		t.Errorf("public = %v, want %v", got, want)
+	}
+	e, _ := p.Store.Load(newID)
+	if _, ok := e.Vars["JWT_SECRET"]; ok {
+		t.Error("public-only copy should not carry secret vars into the new env")
+	}
+	if len(e.Vars) != 2 {
+		t.Errorf("public-only copy should hold only the 2 public vars, got %d", len(e.Vars))
+	}
+}
+
+func TestCopyEnvIndependentOfSource(t *testing.T) {
+	p := newTestProject(t)
+	seedDev(t, p)
+
+	newID, _, _, err := p.CopyEnv("dev", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Mutating the source after the copy must not leak into the copy.
+	if _, err := p.SetVar("dev", "PORT", "changed", true); err != nil {
+		t.Fatal(err)
+	}
+	e, _ := p.Store.Load(newID)
+	if e.Vars["PORT"].Value != "PORT-val" {
+		t.Errorf("copy should be independent of source; PORT = %q", e.Vars["PORT"].Value)
+	}
+}
+
+func TestCopyEnvUnknownSource(t *testing.T) {
+	p := newTestProject(t)
+	if _, _, _, err := p.CopyEnv("ghost", false); err == nil {
+		t.Error("CopyEnv from an unknown env name should error")
+	}
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}

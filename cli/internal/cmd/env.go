@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/joe/shutup/internal/env"
 	"github.com/joe/shutup/internal/project"
@@ -20,18 +21,34 @@ secret-free env bundle to a teammate.`,
 }
 
 // env add
-var envAddLink string
+var (
+	envAddLink       string
+	envAddCopyFrom   string
+	envAddPublicOnly bool
+)
 var envAddCmd = &cobra.Command{
 	Use:   "add <name>",
-	Short: "Register a new env in this project (create fresh, or --link an existing one)",
+	Short: "Register a new env in this project (create fresh, --link, or --copy-from another)",
 	Long: `Adds an env to the current project under <name>.
 
-By default a fresh, empty env is created. With --link <env-id>, this project points
-at an EXISTING env (sharing it) — find ids with ` + "`shutup env list --all`" + `. Sharing means
-two projects (any repos) reference the same env id; values are stored once.`,
+By default a fresh, empty env is created. Alternatives:
+
+  --link <env-id>      point this project at an EXISTING env (sharing it) — find
+                       ids with ` + "`shutup env list --all`" + `. Two projects then reference
+                       the same id; values are stored once.
+  --copy-from <name>   seed the new env with a COPY of another env's values from
+                       this project (e.g. stand up "prod" from "dev"). Values are
+                       copied machine-side and never printed. Add --public-only to
+                       copy just the non-secret vars and re-enter secrets per env.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
+		if envAddLink != "" && envAddCopyFrom != "" {
+			return fmt.Errorf("--link and --copy-from are mutually exclusive: --link shares an existing env, --copy-from seeds a fresh one")
+		}
+		if envAddPublicOnly && envAddCopyFrom == "" {
+			return fmt.Errorf("--public-only only applies with --copy-from")
+		}
 		p, err := project.Open()
 		if err != nil {
 			return err
@@ -40,7 +57,9 @@ two projects (any repos) reference the same env id; values are stored once.`,
 			return fmt.Errorf("this project already has an env named %q", name)
 		}
 		var envID string
-		if envAddLink != "" {
+		var publicNames, secretNames []string
+		switch {
+		case envAddLink != "":
 			e, lerr := p.Store.Load(envAddLink)
 			if lerr == env.ErrNotFound {
 				return fmt.Errorf("no env with id %q on this machine (see `shutup env list --all`)", envAddLink)
@@ -48,7 +67,13 @@ two projects (any repos) reference the same env id; values are stored once.`,
 				return lerr
 			}
 			envID = e.ID
-		} else {
+		case envAddCopyFrom != "":
+			id, pub, sec, cerr := p.CopyEnv(envAddCopyFrom, envAddPublicOnly)
+			if cerr != nil {
+				return cerr
+			}
+			envID, publicNames, secretNames = id, pub, sec
+		default:
 			e, cerr := p.Store.Create()
 			if cerr != nil {
 				return cerr
@@ -61,6 +86,17 @@ two projects (any repos) reference the same env id; values are stored once.`,
 		}
 		if err := p.Config.Save(); err != nil {
 			return err
+		}
+		if envAddCopyFrom != "" {
+			ui.Success("Added env %s (%s) — copied %d vars from %s", ui.Bold(name), ui.Value(envID), len(publicNames)+len(secretNames), ui.Bold(envAddCopyFrom))
+			if len(publicNames) > 0 {
+				ui.Hint("public: %s", strings.Join(publicNames, ", "))
+			}
+			if len(secretNames) > 0 {
+				ui.Hint("secret: %s", strings.Join(secretNames, ", "))
+				ui.Hint("if %s's secrets should differ, overwrite with `shutup set <NAME> --env %s`", name, name)
+			}
+			return nil
 		}
 		ui.Success("Added env %s (%s)", ui.Bold(name), ui.Value(envID))
 		return nil
@@ -78,12 +114,15 @@ lists every env on this machine (id, source, var count) — useful for finding a
 id to ` + "`shutup env add <name> --link <id>`" + `.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		p, err := project.Open()
-		if err != nil {
-			return err
-		}
+		// --all reads the machine-wide store and is project-agnostic, so it
+		// must work outside a project — that's the case where you're hunting
+		// for envs orphaned by `shutup destroy`.
 		if envLsAll {
-			all, lerr := p.Store.List()
+			store, err := env.NewLocalEnvStore()
+			if err != nil {
+				return err
+			}
+			all, lerr := store.List()
 			if lerr != nil {
 				return lerr
 			}
@@ -95,6 +134,10 @@ id to ` + "`shutup env add <name> --link <id>`" + `.`,
 				fmt.Printf("%s  %s  %d vars\n", ui.Bold(e.ID), ui.Dim(e.Source), len(e.Vars))
 			}
 			return nil
+		}
+		p, err := project.Open()
+		if err != nil {
+			return err
 		}
 		if len(p.Config.Envs) == 0 {
 			ui.Info("This project references no envs.")
@@ -326,6 +369,8 @@ name (otherwise it just lands in your store and you link it with
 
 func init() {
 	envAddCmd.Flags().StringVar(&envAddLink, "link", "", "link an existing env id instead of creating a new env")
+	envAddCmd.Flags().StringVar(&envAddCopyFrom, "copy-from", "", "seed the new env with a copy of another project env's values (by name)")
+	envAddCmd.Flags().BoolVar(&envAddPublicOnly, "public-only", false, "with --copy-from, copy only public vars (re-enter secrets per env)")
 	envLsCmd.Flags().BoolVar(&envLsAll, "all", false, "list every env on this machine, not just this project's")
 	envRmCmd.Flags().BoolVar(&envRmDelete, "delete", false, "also delete the env bag from this machine (confirmed)")
 	envExportCmd.Flags().StringVarP(&envExportOut, "out", "o", "", "write the bundle to a file instead of stdout")
