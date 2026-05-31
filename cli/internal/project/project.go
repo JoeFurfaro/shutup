@@ -56,7 +56,7 @@ func (p *Project) ResolveEnv(name string) (*env.Env, error) {
 	}
 	envID, ok := p.Config.EnvID(name)
 	if !ok {
-		return nil, fmt.Errorf("this project has no env named %q (see `shutup env ls`)", name)
+		return nil, fmt.Errorf("this project has no env named %q (see `shutup env list`)", name)
 	}
 	e, err := p.Store.Load(envID)
 	if err == env.ErrNotFound {

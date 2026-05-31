@@ -27,7 +27,7 @@ var envAddCmd = &cobra.Command{
 	Long: `Adds an env to the current project under <name>.
 
 By default a fresh, empty env is created. With --link <env-id>, this project points
-at an EXISTING env (sharing it) — find ids with ` + "`shutup env ls --all`" + `. Sharing means
+at an EXISTING env (sharing it) — find ids with ` + "`shutup env list --all`" + `. Sharing means
 two projects (any repos) reference the same env id; values are stored once.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -43,7 +43,7 @@ two projects (any repos) reference the same env id; values are stored once.`,
 		if envAddLink != "" {
 			e, lerr := p.Store.Load(envAddLink)
 			if lerr == env.ErrNotFound {
-				return fmt.Errorf("no env with id %q on this machine (see `shutup env ls --all`)", envAddLink)
+				return fmt.Errorf("no env with id %q on this machine (see `shutup env list --all`)", envAddLink)
 			} else if lerr != nil {
 				return lerr
 			}
@@ -67,11 +67,12 @@ two projects (any repos) reference the same env id; values are stored once.`,
 	},
 }
 
-// env ls
+// env list
 var envLsAll bool
 var envLsCmd = &cobra.Command{
-	Use:   "ls",
-	Short: "List this project's envs (or --all envs on this machine)",
+	Use:     "list",
+	Aliases: []string{"ls"},
+	Short:   "List this project's envs (or --all envs on this machine)",
 	Long: `Without flags, lists the envs this project references (name -> id). With --all,
 lists every env on this machine (id, source, var count) — useful for finding an
 id to ` + "`shutup env add <name> --link <id>`" + `.`,
@@ -132,11 +133,12 @@ var envDefaultCmd = &cobra.Command{
 	},
 }
 
-// env rm
+// env remove
 var envRmDelete bool
 var envRmCmd = &cobra.Command{
-	Use:   "rm <name>",
-	Short: "Unmap an env from this project (does not delete shared values by default)",
+	Use:     "remove <name>",
+	Aliases: []string{"rm"},
+	Short:   "Unmap an env from this project (does not delete shared values by default)",
 	Long: `Removes the <name> -> id mapping from this project. The env's values are NOT
 deleted by default (other projects may share the env). Pass --delete to also
 delete the env bag from this machine (confirmed) — only do this if nothing else

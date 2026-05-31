@@ -22,7 +22,7 @@ var initCmd = &cobra.Command{
 named "dev".
 
 By default a fresh, empty env is created. Use --link <env-id> to point this
-project at an EXISTING env instead (sharing it) — find ids with ` + "`shutup env ls --all`" + `.
+project at an EXISTING env instead (sharing it) — find ids with ` + "`shutup env list --all`" + `.
 
 Also writes the shutup instruction block into CLAUDE.md so AI agents know to use
 the shutup interface instead of reading .env files.
@@ -61,7 +61,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if initLink != "" {
 		e, lerr := store.Load(initLink)
 		if lerr == env.ErrNotFound {
-			return fmt.Errorf("no env with id %q on this machine (see `shutup env ls --all`)", initLink)
+			return fmt.Errorf("no env with id %q on this machine (see `shutup env list --all`)", initLink)
 		} else if lerr != nil {
 			return lerr
 		}

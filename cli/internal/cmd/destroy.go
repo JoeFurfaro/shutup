@@ -21,7 +21,7 @@ shutup block in CLAUDE.md.
 
 It does NOT delete envs — those are shared values that may be referenced by other
 projects (and live in ~/.shutup/envs/, outside the repo). Delete an env explicitly
-with ` + "`shutup env rm <name> --delete`" + ` only if nothing else uses it. Asks for
+with ` + "`shutup env remove <name> --delete`" + ` only if nothing else uses it. Asks for
 confirmation unless --yes.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -34,7 +34,7 @@ confirmation unless --yes.`,
 		ui.Info("This will remove shutup from this project:")
 		ui.Hint("config:    %s", cfgPath)
 		ui.Hint("CLAUDE.md: the shutup block (if present)")
-		ui.Hint("envs are NOT deleted (shared; use `shutup env rm --delete` for those)")
+		ui.Hint("envs are NOT deleted (shared; use `shutup env remove --delete` for those)")
 
 		if !destroyYes {
 			ans, perr := tty.PromptLine("Type 'yes' to confirm: ")

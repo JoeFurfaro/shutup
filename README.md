@@ -73,7 +73,7 @@ shutup import .env --public PORT,NODE_ENV --delete   # classify by name, import,
 | `list [--env]` | consumed vars + state; secrets never shown |
 | `check <NAME> [--env]` | `exists`/`not found` (exit 0/1), never the value |
 | `run [--env] -- <cmd>` | inject only consumed vars (least-privilege) and exec |
-| `env add/ls/default/rm` | manage which envs a project uses |
+| `env add/list/default/remove` | manage which envs a project uses |
 | `env export/import` | hand a secret-free env bundle (id + public values + secret names) to a teammate |
 | `import <file>` | migrate a `.env` (bare = list names; `--public`/`-i` to classify) |
 | `destroy [--yes]` | remove the project (config + CLAUDE.md block); keeps shared envs |
@@ -104,7 +104,7 @@ shutup run -- docker run --rm -p 3000:3000 \
 ```
 
 **Monorepo** — each app is its own project (`shutup init` in each). Share an env by
-linking the same id (`shutup env add dev --link <id>`, find ids via `shutup env ls --all`),
+linking the same id (`shutup env add dev --link <id>`, find ids via `shutup env list --all`),
 then `shutup use <NAME>`. Each project's `run` injects only what it consumes.
 
 **Onboarding** — teammate clones (config maps `dev` → the shared env id); you send them a
