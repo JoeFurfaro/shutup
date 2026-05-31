@@ -32,7 +32,12 @@ Public (non-sensitive) values may be passed inline, but only with --public:
 An inline value WITHOUT --public is refused: an inline value is visible to anyone
 (or any agent) reading the command, so it must not carry a secret. The value is
 written to --env (default: the project's default_env). Visibility (secret/public)
-is stored on the var in the env. This command never prints the value back.`,
+is stored on the var in the env. This command never prints the value back.
+
+AI AGENTS: you cannot set a SECRET yourself — the hidden prompt needs an
+interactive terminal you don't have, and this will refuse. Ask the user to run
+"shutup set <NAME>" in their own terminal. You CAN set public values inline
+(--public), and you can use secrets afterward via "shutup run".`,
 	Args: cobra.RangeArgs(1, 2),
 	RunE: runSet,
 }
@@ -68,6 +73,14 @@ func runSet(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("public variable %q needs a value: `shutup set %s <value> --public`", name, name)
 		}
 		v, perr := tty.PromptHidden(fmt.Sprintf("Enter value for %s (hidden from your AI agent): ", name))
+		if perr == tty.ErrNoTerminal {
+			return fmt.Errorf(
+				"setting the secret %q needs an interactive terminal (it never reads stdin).\n"+
+					"  if you're an AI agent: do NOT try to set this yourself — ask the user to run\n"+
+					"    shutup set %s\n"+
+					"  in their own terminal. You can still use the secret afterward via `shutup run`.",
+				name, name)
+		}
 		if perr != nil {
 			return perr
 		}

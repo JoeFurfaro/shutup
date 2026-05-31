@@ -35,10 +35,13 @@ the user safe. Every command below is safe for you to run.
 
 ### How to do what you need
 
-- **Add/set a variable** — ` + "`shutup set <NAME>`" + `
-  Opens a hidden prompt where the *user* types the value; it never passes through you
-  (that's intended). Also wires the var into this project's consumes. Use this instead of
-  asking the user to paste a secret. For non-sensitive values: ` + "`shutup set <NAME> <value> --public`" + `.
+- **Set a SECRET — you (the agent) cannot do this yourself.** The value is entered through
+  a hidden terminal prompt that needs an interactive terminal you don't have; running
+  ` + "`shutup set <NAME>`" + ` will just refuse. Instead, **tell the user to run ` + "`shutup set <NAME>`" + `
+  in their own terminal** — they type the value there, it never enters this conversation.
+  (Never ask them to paste a secret into the chat.)
+- **Set a public (non-sensitive) value — you CAN do this** — ` + "`shutup set <NAME> <value> --public`" + `.
+  Both forms wire the var into this project's consumes.
 
 - **Consume an already-set variable** — ` + "`shutup use <NAME>`" + `
   Declares this project needs ` + "`<NAME>`" + ` (e.g. a value already set in a shared env), no value.
@@ -61,8 +64,10 @@ the user safe. Every command below is safe for you to run.
 ### When the user asks you to set up secrets
 
 1. ` + "`shutup missing`" + ` (or, if migrating, ` + "`shutup import <file>`" + ` to list names).
-2. ` + "`shutup set <NAME>`" + ` each missing secret (the user types it); ` + "`--public`" + ` for non-secrets.
-3. Run/test with ` + "`shutup run -- <command>`" + ` — never inline secret values yourself.
+2. For each missing SECRET, tell the user to run ` + "`shutup set <NAME>`" + ` in their terminal (you
+   can't — it needs an interactive prompt). Set non-secrets yourself with ` + "`--public`" + `.
+3. Once they confirm, run/test with ` + "`shutup run -- <command>`" + ` — the process gets the values,
+   you never do.
 
 If you think you need a secret's actual value, you almost certainly don't: use
 ` + "`shutup check`" + ` to confirm it exists and ` + "`shutup run`" + ` to use it.`
